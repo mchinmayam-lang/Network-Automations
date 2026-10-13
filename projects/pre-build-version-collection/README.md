@@ -1,13 +1,24 @@
 # Pre-Build Node Version Collection
 
-Collect the output of `show version` from network devices over SSH using node details stored in an Excel workbook. The automation accepts an Excel (.xlsx) workbook or CSV input file and writes an Excel report with the device status, detected hostname/version, full command output, collection timestamp, and any error message.
+Collect `show version` output over SSH from Cisco **IOS-XR**, **IOS-XE**, and **NX-OS** devices using node details stored in an Excel workbook or CSV file. The script uses Netmiko's platform-specific drivers and writes an Excel report with the detected hostname/version, status, full command output, collection timestamp, and error details.
+
+## Supported Cisco platforms
+
+| Platform | Netmiko `Device_Type` | Template |
+| --- | --- | --- |
+| Cisco IOS-XR | `cisco_xr` | [templates/ios_xr_nodes.csv](templates/ios_xr_nodes.csv) |
+| Cisco IOS-XE | `cisco_xe` | [templates/ios_xe_nodes.csv](templates/ios_xe_nodes.csv) |
+| Cisco NX-OS | `cisco_nxos` | [templates/nxos_nodes.csv](templates/nxos_nodes.csv) |
+
+Each template is CSV format, which opens in Microsoft Excel. Each includes example rows with documentation-only IP addresses and placeholder credentials. Replace all example values before running the script. The `192.0.2.0/24` range is reserved for documentation and does not identify real devices.
 
 ## Features
 
 - Reads multiple nodes from an `.xlsx` workbook or `.csv` file.
 - Uses SSH credentials from the input file.
-- Runs `show version` on each node.
-- Supports per-node Netmiko `Device_Type`, with Cisco NX-OS as the default.
+- Runs the read-only `show version` command on each node.
+- Supports mixed IOS-XR, IOS-XE, and NX-OS devices in one input file.
+- Selects the Netmiko driver using each row's `Device_Type`; accepts friendly aliases such as `ios-xr`, `ios-xe`, and `nx-os`.
 - Continues to the next node if a connection or command fails.
 - Writes a report with `Results` and `Summary` worksheets.
 - Does not intentionally print or write passwords into the report.
@@ -41,54 +52,53 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## 1. Get the sample input template
+## Input file format
 
-A sample CSV input file is included at [`sample_nodes.csv`](sample_nodes.csv). It can be opened and edited in Excel. It contains documentation-only IP addresses and placeholder credentials; replace all sample values before use. The `192.0.2.0/24` range is reserved for documentation and will not identify real devices.
-
-Alternatively, generate a blank Excel workbook with the required headers:
-
-```bash
-python src/collect_versions.py --create-template nodes.xlsx
-```
-
-## 2. Create or edit the input file
-
-Fill in the workbook or sample CSV with one row per device. Do not commit your completed workbook or CSV to GitHub because it contains credentials.
+Use one of the three platform templates linked above, or create your own input file with one row per device.
 
 | Column | Required | Description | Example |
 | --- | --- | --- | --- |
 | `Node_IP` | Yes | Management IP or resolvable hostname | `192.0.2.10` |
 | `Username` | Yes | SSH username | `automation-user` |
 | `Password` | Yes | SSH password | Enter locally in Excel |
-| `Device_Type` | No | Netmiko platform identifier | `cisco_nxos` |
+| `Device_Type` | Recommended | Netmiko platform identifier | `cisco_xr`, `cisco_xe`, or `cisco_nxos` |
 
-The example IP above is a documentation-only address. Replace it with an authorized lab or production target. The `Device_Type` column can be left blank to use the default.
+The row's `Device_Type` takes precedence over the fallback `--default-device-type`. For a mixed-platform fleet, set `Device_Type` on every row. If it is blank, the default is `cisco_nxos`.
 
-Common Netmiko identifiers include `cisco_nxos` for Cisco Nexus NX-OS, `cisco_ios` for Cisco IOS, and `cisco_xe` for Cisco IOS XE. Confirm the correct identifier for your device and installed Netmiko version.
+You can also generate a blank Excel workbook locally:
 
-## 3. Run the collection
+```bash
+# Blank template intended for IOS-XR
+python src/collect_versions.py --create-template nodes_ios_xr.xlsx --default-device-type cisco_xr
 
-For Cisco Nexus / NX-OS devices:
+# Blank template intended for IOS-XE
+python src/collect_versions.py --create-template nodes_ios_xe.xlsx --default-device-type cisco_xe
+
+# Blank template intended for NX-OS
+python src/collect_versions.py --create-template nodes_nxos.xlsx --default-device-type cisco_nxos
+```
+
+The generated workbook contains the required column headers. Set `Device_Type` in each row, or use the matching fallback option when running the script.
+
+## Run the collection
+
+Examples using the platform-specific CSV templates:
+
+```bash
+python src/collect_versions.py --input templates/ios_xr_nodes.csv --output reports/ios_xr_version_report.xlsx --default-device-type cisco_xr
+python src/collect_versions.py --input templates/ios_xe_nodes.csv --output reports/ios_xe_version_report.xlsx --default-device-type cisco_xe
+python src/collect_versions.py --input templates/nxos_nodes.csv --output reports/nxos_version_report.xlsx --default-device-type cisco_nxos
+```
+
+To collect from a mixed-platform inventory, put the correct `Device_Type` in each row and use a single input file:
 
 ```bash
 python src/collect_versions.py --input nodes.xlsx --output reports/prebuild_version_report.xlsx
 ```
 
-For a different default platform:
+Use `--timeout 25` to change the SSH connection and authentication timeout.
 
-```bash
-python src/collect_versions.py --input nodes.xlsx --output reports/prebuild_version_report.xlsx --default-device-type cisco_ios
-```
-
-A per-row `Device_Type` value takes precedence over the default. Use `--timeout 25` to change the SSH connection and authentication timeout.
-
-## 3. Review the report
-
-The input can be either `.xlsx` or `.csv`. For example, to use the sample CSV after replacing its placeholders:
-
-```bash
-python src/collect_versions.py --input sample_nodes.csv --output reports/prebuild_version_report.xlsx
-```
+## Report contents
 
 The output workbook contains:
 
@@ -99,10 +109,10 @@ The script exits with code `0` when all nodes succeed, `1` when one or more node
 
 ## Security and operational notes
 
-- Treat the input workbook as a secret: restrict file permissions, store it in an approved secure location, and delete it securely when no longer needed.
+- Treat input workbooks as secrets: restrict file permissions and store them in an approved secure location.
 - Never commit real credentials, credential-filled workbooks, reports, private keys, or sensitive device output to GitHub.
 - Use an approved least-privilege account and test in a lab before wider use.
-- The script uses SSH host connections through Netmiko. Before running in a sensitive environment, validate host-key and SSH trust requirements against your organization's policy.
+- The script uses SSH through Netmiko. Validate SSH host-key and trust requirements against your organization's policy before running in a sensitive environment.
 - The script only runs `show version`; it does not intentionally change device configuration.
 - Error messages may contain device or network details. Review the generated report before sharing it.
 
@@ -110,10 +120,10 @@ The script exits with code `0` when all nodes succeed, `1` when one or more node
 
 - **Timeout / connection refused:** Verify routing, management reachability, SSH service, ACLs, and TCP port 22.
 - **Authentication failure:** Verify the username/password and account access policy.
-- **Unsupported device type:** Check the Netmiko platform identifier and installed version.
-- **Missing columns:** Use the generated template and keep the required headers exactly as shown.
-- **Version shows `See full output`:** The full command output is retained in the report; adjust the parser for that platform's output format if needed.
+- **Unsupported device type:** Use the Netmiko identifier for the platform and check your installed Netmiko version.
+- **Missing columns:** Use a supplied template and keep the required headers exactly as shown.
+- **Version shows `See full output`:** The full command output is retained in the report; the parser may need adjustment for an unusual software output format.
 
 ## Validation status
 
-This initial implementation has been reviewed for structure and error-handling logic, but it has not been tested against your actual network devices. Validate it against a lab node and confirm the report output before operational use.
+The script has been updated for all three Cisco platforms and the templates are based on Netmiko's documented device-type identifiers. It has not been tested against your actual network devices; validate it against at least one lab device per platform before operational use.
