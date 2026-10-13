@@ -1,6 +1,6 @@
 # Pre-Build Node Version Collection
 
-Collect the output of `show version` from network devices over SSH using node details stored in an Excel workbook. The automation writes an Excel report with the device status, detected hostname/version, full command output, collection timestamp, and any error message.
+Collect the output of `show version` from network devices over SSH using node details stored in an Excel workbook. The automation accepts an Excel (.xlsx) workbook or CSV input file and writes an Excel report with the device status, detected hostname/version, full command output, collection timestamp, and any error message.
 
 ## Features
 
@@ -41,13 +41,23 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-## 1. Create the input Excel template
+## 1. Get the sample input template
+
+A sample CSV input file is included at [`sample_nodes.csv`](sample_nodes.csv). It can be opened and edited in Excel. It contains documentation-only IP addresses and placeholder credentials; replace all sample values before use. The `192.0.2.0/24` range is reserved for documentation and will not identify real devices.
+
+Alternatively, generate a blank Excel workbook with the required headers:
 
 ```bash
 python src/collect_versions.py --create-template nodes.xlsx
 ```
 
-Fill in the generated workbook with one row per device. Do not commit this workbook to GitHub because it contains credentials.
+## 2. Create or edit the input file
+
+```bash
+python src/collect_versions.py --create-template nodes.xlsx
+```
+
+Fill in the workbook or sample CSV with one row per device. Do not commit your completed workbook or CSV to GitHub because it contains credentials.
 
 | Column | Required | Description | Example |
 | --- | --- | --- | --- |
@@ -60,7 +70,7 @@ The example IP above is a documentation-only address. Replace it with an authori
 
 Common Netmiko identifiers include `cisco_nxos` for Cisco Nexus NX-OS, `cisco_ios` for Cisco IOS, and `cisco_xe` for Cisco IOS XE. Confirm the correct identifier for your device and installed Netmiko version.
 
-## 2. Run the collection
+## 3. Run the collection
 
 For Cisco Nexus / NX-OS devices:
 
@@ -77,6 +87,12 @@ python src/collect_versions.py --input nodes.xlsx --output reports/prebuild_vers
 A per-row `Device_Type` value takes precedence over the default. Use `--timeout 25` to change the SSH connection and authentication timeout.
 
 ## 3. Review the report
+
+The input can be either `.xlsx` or `.csv`. For example, to use the sample CSV after replacing its placeholders:
+
+```bash
+python src/collect_versions.py --input sample_nodes.csv --output reports/prebuild_version_report.xlsx
+```
 
 The output workbook contains:
 
