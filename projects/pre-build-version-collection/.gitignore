@@ -1,0 +1,14 @@
+# Local input workbooks may contain SSH credentials
+nodes*.xlsx
+*.credentials.xlsx
+
+# Generated reports
+reports/
+prebuild_version_report*.xlsx
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
