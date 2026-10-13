@@ -4,7 +4,7 @@ Collect the output of `show version` from network devices over SSH using node de
 
 ## Features
 
-- Reads multiple nodes from an `.xlsx` input workbook.
+- Reads multiple nodes from an `.xlsx` workbook or `.csv` file.
 - Uses SSH credentials from the input file.
 - Runs `show version` on each node.
 - Supports per-node Netmiko `Device_Type`, with Cisco NX-OS as the default.
@@ -52,10 +52,6 @@ python src/collect_versions.py --create-template nodes.xlsx
 ```
 
 ## 2. Create or edit the input file
-
-```bash
-python src/collect_versions.py --create-template nodes.xlsx
-```
 
 Fill in the workbook or sample CSV with one row per device. Do not commit your completed workbook or CSV to GitHub because it contains credentials.
 
