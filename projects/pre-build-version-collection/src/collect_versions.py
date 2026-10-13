@@ -119,9 +119,9 @@ def collect_one(row: dict[str, str], default_device_type: str, timeout: int) -> 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Collect show version output from nodes listed in an Excel workbook."
+        description="Collect show version output from nodes listed in an Excel or CSV input file."
     )
-    parser.add_argument("--input", help="Input .xlsx file with Node_IP, Username, Password columns")
+    parser.add_argument("--input", help="Input .xlsx or .csv file with Node_IP, Username, Password columns")
     parser.add_argument(
         "--output",
         default=f"prebuild_version_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
@@ -145,7 +145,7 @@ def main() -> int:
         return 0
 
     if not args.input:
-        parser.error("provide --input FILE.xlsx or use --create-template PATH")
+        parser.error("provide --input FILE.xlsx or FILE.csv, or use --create-template PATH")
 
     input_path = Path(args.input)
     output_path = Path(args.output)
@@ -159,9 +159,12 @@ def main() -> int:
         parser.error("--timeout must be at least 1 second")
 
     try:
-        source = pd.read_excel(input_path, dtype=str).fillna("")
+        if input_path.suffix.lower() == ".csv":
+            source = pd.read_csv(input_path, dtype=str).fillna("")
+        else:
+            source = pd.read_excel(input_path, dtype=str).fillna("")
     except Exception as exc:
-        print(f"Could not read input workbook: {exc}", file=sys.stderr)
+        print(f"Could not read input file (supported formats: .xlsx, .csv): {exc}", file=sys.stderr)
         return 2
 
     missing = REQUIRED_COLUMNS - set(source.columns)
