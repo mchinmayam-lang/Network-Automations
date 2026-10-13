@@ -37,7 +37,7 @@ def normalize_device_type(value: str) -> str:
 
 
 def create_template(path: Path, device_type: str) -> None:
-    """Create a blank Excel input template with the selected platform prefilled."""
+    """Create a blank Excel input template and display the intended fallback platform."""
     path.parent.mkdir(parents=True, exist_ok=True)
     columns = ["Node_IP", "Username", "Password", "Device_Type"]
     pd.DataFrame(columns=columns).to_excel(path, index=False, sheet_name="Nodes")
