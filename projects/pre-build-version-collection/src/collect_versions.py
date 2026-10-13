@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Collect 'show version' output from network devices listed in an Excel workbook."""
+"""Collect 'show version' output from Cisco IOS-XR, IOS-XE, and NX-OS devices."""
 
 from __future__ import annotations
 
@@ -14,15 +14,35 @@ from netmiko import ConnectHandler
 
 
 REQUIRED_COLUMNS = {"Node_IP", "Username", "Password"}
-OPTIONAL_COLUMNS = {"Device_Type"}
+SUPPORTED_DEVICE_TYPES = {
+    "cisco_xr": "cisco_xr",
+    "ios-xr": "cisco_xr",
+    "ios_xr": "cisco_xr",
+    "xr": "cisco_xr",
+    "cisco_xe": "cisco_xe",
+    "ios-xe": "cisco_xe",
+    "ios_xe": "cisco_xe",
+    "xe": "cisco_xe",
+    "cisco_nxos": "cisco_nxos",
+    "nx-os": "cisco_nxos",
+    "nx_os": "cisco_nxos",
+    "nxos": "cisco_nxos",
+}
 
 
-def create_template(path: Path) -> None:
-    """Create an empty Excel input template with the required column names."""
+def normalize_device_type(value: str) -> str:
+    """Normalize friendly platform names to Netmiko device_type identifiers."""
+    normalized = value.strip().lower()
+    return SUPPORTED_DEVICE_TYPES.get(normalized, normalized)
+
+
+def create_template(path: Path, device_type: str) -> None:
+    """Create a blank Excel input template with the selected platform prefilled."""
     path.parent.mkdir(parents=True, exist_ok=True)
     columns = ["Node_IP", "Username", "Password", "Device_Type"]
     pd.DataFrame(columns=columns).to_excel(path, index=False, sheet_name="Nodes")
-    print(f"Created input template: {path}")
+    print(f"Created blank input template: {path}")
+    print(f"Set Device_Type to {normalize_device_type(device_type)} for each node, or use --default-device-type.")
 
 
 def parse_version(output: str) -> str:
@@ -30,6 +50,7 @@ def parse_version(output: str) -> str:
     patterns = [
         r"NXOS:\s+version\s+([^\s]+)",
         r"Cisco IOS XE Software, Version\s+([^\s,]+)",
+        r"Cisco IOS XR Software, Version\s+([^\s,]+)",
         r"Cisco IOS Software.*Version\s+([^,\s]+)",
         r"system:\s+version\s+([^\s]+)",
         r"\bVersion\s+([0-9][A-Za-z0-9()._-]*)",
@@ -58,10 +79,10 @@ def parse_hostname(output: str, prompt: str = "") -> str:
 
 def collect_one(row: dict[str, str], default_device_type: str, timeout: int) -> dict[str, str]:
     """Connect to one device, run show version, and return a report row."""
-    node_ip = row.get("Node_IP", "").strip()
-    username = row.get("Username", "").strip()
-    password = row.get("Password", "")
-    device_type = row.get("Device_Type", "").strip() or default_device_type
+    node_ip = str(row.get("Node_IP", "")).strip()
+    username = str(row.get("Username", "")).strip()
+    password = str(row.get("Password", ""))
+    device_type = normalize_device_type(str(row.get("Device_Type", "")).strip() or default_device_type)
 
     result = {
         "Node_IP": node_ip,
@@ -119,7 +140,7 @@ def collect_one(row: dict[str, str], default_device_type: str, timeout: int) -> 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Collect show version output from nodes listed in an Excel or CSV input file."
+        description="Collect show version output from Cisco IOS-XR, IOS-XE, and NX-OS nodes listed in Excel or CSV."
     )
     parser.add_argument("--input", help="Input .xlsx or .csv file with Node_IP, Username, Password columns")
     parser.add_argument(
@@ -130,18 +151,18 @@ def main() -> int:
     parser.add_argument(
         "--default-device-type",
         default="cisco_nxos",
-        help="Netmiko device_type used when Device_Type is blank (default: cisco_nxos)",
+        help="Fallback Netmiko type: cisco_xr, cisco_xe, or cisco_nxos (default: cisco_nxos)",
     )
     parser.add_argument("--timeout", type=int, default=15, help="SSH connection/auth timeout in seconds")
     parser.add_argument(
         "--create-template",
         metavar="PATH",
-        help="Create an empty input Excel template at PATH and exit",
+        help="Create a blank Excel input template at PATH and exit",
     )
     args = parser.parse_args()
 
     if args.create_template:
-        create_template(Path(args.create_template))
+        create_template(Path(args.create_template), args.default_device_type)
         return 0
 
     if not args.input:
@@ -158,11 +179,18 @@ def main() -> int:
     if args.timeout < 1:
         parser.error("--timeout must be at least 1 second")
 
+    default_device_type = normalize_device_type(args.default_device_type)
+    if default_device_type not in {"cisco_xr", "cisco_xe", "cisco_nxos"}:
+        parser.error("--default-device-type must be cisco_xr, cisco_xe, or cisco_nxos")
+
     try:
         if input_path.suffix.lower() == ".csv":
             source = pd.read_csv(input_path, dtype=str).fillna("")
-        else:
+        elif input_path.suffix.lower() == ".xlsx":
             source = pd.read_excel(input_path, dtype=str).fillna("")
+        else:
+            print("Unsupported input format. Use .xlsx or .csv.", file=sys.stderr)
+            return 2
     except Exception as exc:
         print(f"Could not read input file (supported formats: .xlsx, .csv): {exc}", file=sys.stderr)
         return 2
@@ -183,7 +211,7 @@ def main() -> int:
     for index, row in enumerate(rows, start=1):
         node_ip = str(row.get("Node_IP", "")).strip() or f"row {index}"
         print(f"[{index}/{total}] Collecting version from {node_ip} ...")
-        result = collect_one(row, args.default_device_type, args.timeout)
+        result = collect_one(row, default_device_type, args.timeout)
         print(f"  {result['Status']}: {result['Hostname'] or result['Node_IP']}")
         results.append(result)
 
