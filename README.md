@@ -8,7 +8,7 @@ A growing collection of practical network automation projects, with an initial f
 
 | Project | Description | Status |
 | --- | --- | --- |
-| [Pre-Build Node Version Collection](projects/pre-build-version-collection/README.md) | Connect to nodes over SSH, run `show version`, and export an Excel report. | Initial implementation; validate in a lab before operational use |
+| [Cisco Version Collector](projects/cisco-version-collector/README.md) | Connect to nodes over SSH, run `show version`, and export an Excel report. | Initial implementation; validate in a lab before operational use |
 
 ## Repository layout
 
@@ -16,10 +16,15 @@ A growing collection of practical network automation projects, with an initial f
 Network-Automations/
 ├── README.md
 └── projects/
-    └── pre-build-version-collection/
+    └── cisco-version-collector/
         ├── README.md
         ├── requirements.txt
         ├── .gitignore
+        ├── sample_nodes.csv
+        ├── templates/
+        │   ├── ios_xr_nodes.csv
+        │   ├── ios_xe_nodes.csv
+        │   └── nxos_nodes.csv
         └── src/
             └── collect_versions.py
 ```
